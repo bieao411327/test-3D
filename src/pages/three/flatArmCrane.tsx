@@ -1,0 +1,630 @@
+import {Billboard, Text, useGLTF} from "@react-three/drei";
+import {memo, useEffect, useRef} from "react";
+import {useFrame} from "@react-three/fiber";
+
+interface Props {
+  x: number;
+  y: number;
+  craneNum: string;
+  jibArmLength: number;
+  craneHeight: number;
+  balanceArmLength: number;
+  isOnline: number;
+  angle: number;
+  hookHeight: number;
+  radius: number;
+  loadWeight: number;
+  baseScale: number;
+  modelScale?: number;
+  offlineMaterial: any;
+  animationInterval?: number
+}
+
+// 平臂塔机粗细占大臂长度比
+const boomRate = 0.65
+const allGlbSizeObj = {
+  base: {x: 200.72, y: 10, z: 222.37},
+  bodySection: {x: 62.47, y: 78, z: 62.71},
+  jackingFrame: {x: 135.7, y: 250.88, z: 185.43},
+  pilothouse: {x: 136.2, y: 115.7, z: 141.27},
+  connectingFrame: {x: 66.66, y: 46.29, z: 61.11},
+  boom: {x: 63.04, y: 47, z: 120},
+  connection: {x: 63.09, y: 47.22, z: 101.34},
+  forearm: {x: 63.04, y: 32.35, z: 79},
+  forearmEnd: {x: 63.04, y: 32.35, z: 79},
+  rearAxle: {x: 63.04, y: 47, z: 127.015},
+  counterWeightArea: {x: 140.05, y: 115.56, z: 183.03},
+  trolley: {x: 97.03, y: 38.09, z: 44.61},
+  carSteelRope: {x: 3, y: 139.33, z: 23.55},
+  hook: {x: 14.27, y: 104.72, z: 74.57},
+  suspendedObject: {x: 100.63, y: 300.76, z: 100.2},
+}
+
+// 计算弧度
+const calcRadians = (degrees: number) => degrees * (Math.PI / 180)
+
+// 添加基础
+const AddBaseGLB = ({isOnline, offlineMaterial}: any) => {
+  const {nodes, materials}: any = useGLTF(`/glb/base.glb`)
+  const material = isOnline ? materials.whitePaint : offlineMaterial
+  return (
+    <mesh geometry={nodes.base.geometry} material={material}/>
+  )
+}
+
+// 添加塔身标准节
+const AddBodySectionGLB = ({position, isOnline, offlineMaterial}: any) => {
+  const {nodes, materials}: any = useGLTF(`/glb/standardSection.glb`)
+  const material = isOnline ? materials.bluePaint : offlineMaterial
+  return (
+    <mesh geometry={nodes.standardSection.geometry} material={material} position={position}/>
+  )
+}
+
+// 添加顶升套架
+const AddJackingFrameGLB = ({position, isOnline, offlineMaterial}: any) => {
+  const {nodes, materials}: any = useGLTF(`/glb/jackingFrame.glb`)
+  const material = isOnline ? materials.whitePaint : offlineMaterial
+  return (
+    <mesh geometry={nodes.jackingFrame.geometry} material={material} position={position}/>
+  )
+}
+
+// 添加回转台+驾驶室
+const AddPilothouseGLB = ({position, isOnline, offlineMaterial}: any) => {
+  const {nodes, materials}: any = useGLTF(`/glb/pilothouse.glb`)
+  const material = isOnline ? materials.whitePaint : offlineMaterial
+  return (
+    <mesh geometry={nodes.pilothouse.geometry} material={material} position={position}/>
+  )
+}
+// 添加大臂和平横臂的链接
+const AddConnectingFrameGLB = ({isOnline, offlineMaterial}: any) => {
+  const {nodes, materials}: any = useGLTF(`/glb/flatArmConnectingFrame.glb`)
+  const material = isOnline ? materials.whitePaint : offlineMaterial
+  return (
+    <mesh geometry={nodes.connectingFrame.geometry} material={material}/>
+  )
+}
+// 添加起重臂（粗）
+const AddBoomArmGLB = ({position, isOnline, offlineMaterial}: any) => {
+  const {nodes, materials}: any = useGLTF(`/glb/boom.glb`)
+  const material = isOnline ? materials.bluePaint : offlineMaterial
+  return (
+    <mesh geometry={nodes.boom.geometry} material={material} position={position}/>
+  )
+}
+
+// 添加起重臂链接
+const AddConnectionGLB = ({position, isOnline, offlineMaterial}: any) => {
+  const {nodes, materials}: any = useGLTF(`/glb/flatArmConnection.glb`)
+  const material = isOnline ? materials.bluePaint : offlineMaterial
+  return (
+    <mesh geometry={nodes.connection.geometry} material={material} position={position}/>
+  )
+}
+
+// 添加起重臂（细）
+const AddForearmGLB = ({position, isOnline, offlineMaterial}: any) => {
+  const {nodes, materials}: any = useGLTF(`/glb/flatArmForearm.glb`)
+  const material = isOnline ? materials.bluePaint : offlineMaterial
+  return (
+    <mesh geometry={nodes.forearm.geometry} material={material} position={position}/>
+  )
+}
+
+// 添加起重臂（细）端
+const AddForearmEndGLB = ({position, isOnline, offlineMaterial}: any) => {
+  const {nodes, materials}: any = useGLTF(`/glb/flatArmForearmEnd.glb`)
+  const material = isOnline ? materials.bluePaint : offlineMaterial
+  return (
+    <mesh geometry={nodes.forearmEnd.geometry} material={material} position={position}/>
+  )
+}
+
+// 添加后桥
+const AddRearAxleGLB = ({position, isOnline, offlineMaterial}: any) => {
+  const {nodes, materials}: any = useGLTF(`/glb/flatArmRearAxle.glb`)
+  const material = isOnline ? materials.whitePaint : offlineMaterial
+  return (
+    <mesh geometry={nodes.rearAxle.geometry} material={material} position={position}/>
+  )
+}
+
+// 添加配重
+const AddCounterWeightAreaGLB = ({position, isOnline, offlineMaterial}: any) => {
+  const {nodes, materials}: any = useGLTF(`/glb/counterWeightArea.glb`)
+  const material = isOnline ? materials.whitePaint : offlineMaterial
+  return (
+    <mesh geometry={nodes.towerHeadCounterWeightArea.geometry} material={material} position={position}/>
+  )
+}
+
+// 添加小车
+const AddTrolleyGLB = ({isOnline, offlineMaterial}: any) => {
+  const {nodes, materials}: any = useGLTF(`/glb/trolley.glb`)
+  const material = isOnline ? materials.whitePaint : offlineMaterial
+  return (
+    <mesh geometry={nodes.trolley.geometry} material={material}/>
+  )
+}
+
+// 添加小车钢绳
+const AddCarSteelRopeGLB = ({isOnline, offlineMaterial}: any) => {
+  const {nodes, materials}: any = useGLTF(`/glb/carSteelRope.glb`)
+  const material = isOnline ? materials.whitePaint : offlineMaterial
+  return (
+    <mesh geometry={nodes.carSteelRope.geometry} material={material}/>
+  )
+}
+
+// 添加小车钢绳
+const AddHookGLB = ({isOnline, offlineMaterial}: any) => {
+  const {nodes, materials}: any = useGLTF(`/glb/hook.glb`)
+  const material = isOnline ? materials.whitePaint : offlineMaterial
+  return (
+    <mesh geometry={nodes.hook.geometry} material={material}/>
+  )
+}
+
+// 添加吊物
+const AddSuspendedObjectGLB = ({isOnline, offlineMaterial}: any) => {
+  const {nodes, materials}: any = useGLTF(`/glb/suspendedObject.glb`)
+  const material = isOnline ? materials.whitePaint : offlineMaterial
+  return (
+    <mesh geometry={nodes.suspendedObject.geometry} material={material}/>
+  )
+}
+
+// 文字
+function Word({children, ...props}: any) {
+  const fontProps = {
+    font: './fonts/Inter-Bold.woff',
+    fontSize: 100,
+    fontWeight: 'bold',
+    letterSpacing: -0.05,
+    lineHeight: 1,
+    'material-toneMapped': false
+  }
+
+  return (
+    <Billboard {...props}>
+      <Text {...fontProps} color={'white'}>{children}</Text>
+    </Billboard>
+  )
+}
+
+// 加载塔机
+const LoadGLB = (
+  {
+    craneHeight,
+    jibArmLength,
+    balanceArmLength,
+    craneNum,
+    baseScale,
+    modelScale,
+    turnRef,
+    armRef,
+    trolleyRef,
+    steelRopeRef,
+    hookRef,
+    suspendedObjectRef,
+    isOnline,
+    offlineMaterial
+  }: any): any => {
+
+  // 塔机
+  const craneGroup: any[] = []
+  // 回转台
+  const turnGroup: any[] = []
+  const armGroup: any[] = []
+  // 小车+吊钩+吊物
+  const trolleyGroup: any[] = []
+  const steelRopeGroup: any[] = []
+  const hookGroup: any[] = []
+  const suspendedObjectGroup: any[] = []
+  const baseY = allGlbSizeObj.base.y
+  const bodySectionY = allGlbSizeObj.bodySection.y
+  const canvasCraneHeight = craneHeight / modelScale * baseScale
+  const bodySectionSize = Math.floor(canvasCraneHeight / bodySectionY)
+  const bodySectionExtra = canvasCraneHeight % bodySectionY
+  // 不满一节标准节的不再绘制后续塔机部件，认定为存在异常
+  if (!bodySectionSize) return;
+  for (let i = 0; i < bodySectionSize; i++) {
+    craneGroup.push(
+      <AddBodySectionGLB
+        key={`bodySection-${i}`}
+        position={[0, baseY + (bodySectionY * i), 0]}
+        isOnline={isOnline}
+        offlineMaterial={offlineMaterial}
+      />
+    )
+  }
+  // 塔机高度
+  let curBodyHeight = baseY + (bodySectionY * bodySectionSize)
+  if (bodySectionExtra) {
+    // 如果存在未满bodySectionHeight的标准节做缩紧操作
+    craneGroup.push(
+      <AddBodySectionGLB
+        key={`bodySection-extra`}
+        position={[0, curBodyHeight - (bodySectionY - bodySectionExtra), 0]}
+        isOnline={isOnline}
+        offlineMaterial={offlineMaterial}
+      />
+    )
+  }
+  curBodyHeight += bodySectionExtra
+  // 加载顶升套架
+  craneGroup.push(
+    <AddJackingFrameGLB key={`jacking-frame`} position={[0, curBodyHeight, 0]} isOnline={isOnline}
+                        offlineMaterial={offlineMaterial}/>
+  )
+  curBodyHeight += allGlbSizeObj.jackingFrame.y
+  // 加载回转台+驾驶室
+  turnGroup.push(
+    <AddPilothouseGLB key={`pilothouse`} position={[0, curBodyHeight, 0]} isOnline={isOnline}
+                      offlineMaterial={offlineMaterial}/>
+  )
+  // 0.1642：是顶部链接部件在回转台顶部的高度/回转台模型的高度
+  curBodyHeight += allGlbSizeObj.pilothouse.y - allGlbSizeObj.pilothouse.y * 0.1642
+  // 添加大臂和平横臂的链接
+  armGroup.push(
+    <AddConnectingFrameGLB key={`connecting-frame`} isOnline={isOnline} offlineMaterial={offlineMaterial}/>
+  )
+  let curArmSectionZ = -allGlbSizeObj.connectingFrame.z / 2
+  const canvasJibArmLength = jibArmLength / modelScale * baseScale - allGlbSizeObj.connectingFrame.z / 2
+  const boomLength = canvasJibArmLength * boomRate
+  const boomSize = Math.floor(boomLength / allGlbSizeObj.boom.z)
+  // 不满一节标准节的不拼接，认定为异常
+  if (!boomSize) return;
+  // 添加大臂（粗）
+  {
+    for (let i = 0; i < boomSize; i++) {
+      armGroup.push(
+        <AddBoomArmGLB
+          key={`boom-${i}`}
+          position={[0, 0, curArmSectionZ - allGlbSizeObj.boom.z * i]}
+          isOnline={isOnline}
+          offlineMaterial={offlineMaterial}
+        />
+      )
+    }
+  }
+  curArmSectionZ -= allGlbSizeObj.boom.z * boomSize
+  // 添加起重臂链接
+  armGroup.push(
+    <AddConnectionGLB key={`connection`} position={[0, 0, curArmSectionZ]} isOnline={isOnline}
+                      offlineMaterial={offlineMaterial}/>
+  )
+  curArmSectionZ -= allGlbSizeObj.connection.z
+  // 添加起重臂（细）,减去大臂、链接部位、小臂末端
+  const forearmLength = canvasJibArmLength - (allGlbSizeObj.boom.z * boomSize) - allGlbSizeObj.connection.z - allGlbSizeObj.forearmEnd.z
+  const forearmSize = Math.floor(forearmLength / allGlbSizeObj.forearm.z)
+  const forearmExtra = forearmLength % allGlbSizeObj.forearm.z
+  // 不满一节标准节的不拼接，认定为异常
+  if (!forearmSize) return;
+  {
+    for (let i = 0; i < forearmSize; i++) {
+      armGroup.push(
+        <AddForearmGLB
+          key={`forearm-${i}`}
+          position={[0, 0, curArmSectionZ - allGlbSizeObj.forearm.z * i]}
+          isOnline={isOnline}
+          offlineMaterial={offlineMaterial}
+        />
+      )
+    }
+  }
+  curArmSectionZ -= allGlbSizeObj.forearm.z * forearmSize
+  if (forearmExtra) {
+    armGroup.push(
+      <AddForearmGLB
+        key={`forearm-extra`}
+        position={[0, 0, curArmSectionZ + (allGlbSizeObj.forearm.z - forearmExtra)]}
+        isOnline={isOnline}
+        offlineMaterial={offlineMaterial}
+      />
+    )
+  }
+  // 添加小臂末端
+  curArmSectionZ -= forearmExtra
+  armGroup.push(
+    <AddForearmEndGLB
+      key={`forearmEnd`}
+      position={[0, 0, curArmSectionZ]}
+      isOnline={isOnline}
+      offlineMaterial={offlineMaterial}
+    />
+  )
+  // 添加后桥标准节
+  let curBalanceSectionZ = allGlbSizeObj.connectingFrame.z / 2
+  const canvasBalanceCraneLength = balanceArmLength / modelScale * baseScale
+  const canvasBalanceSectionLength = canvasBalanceCraneLength - allGlbSizeObj.counterWeightArea.z
+  const balanceSectionSize = Math.floor(canvasBalanceSectionLength / allGlbSizeObj.rearAxle.z)
+  // 如果存在后桥长度小于模型长度，则直接拼接模型
+  if (canvasBalanceSectionLength > 0 && balanceSectionSize >= 1) {
+    const balanceExtra = canvasBalanceSectionLength % allGlbSizeObj.rearAxle.z
+    {
+      for (let i = 0; i < balanceSectionSize; i++) {
+        armGroup.push(
+          <AddRearAxleGLB
+            key={`rearAxle-${i}`}
+            position={[0, 0, curBalanceSectionZ + allGlbSizeObj.rearAxle.z * i]}
+            isOnline={isOnline}
+            offlineMaterial={offlineMaterial}
+          />
+        )
+      }
+    }
+    curBalanceSectionZ += allGlbSizeObj.rearAxle.z * balanceSectionSize
+    if (balanceExtra) {
+      armGroup.push(
+        <AddRearAxleGLB
+          key={`rearAxle-extra`}
+          position={[0, 0, curBalanceSectionZ - (allGlbSizeObj.rearAxle.z - balanceExtra)]}
+          isOnline={isOnline}
+          offlineMaterial={offlineMaterial}
+        />
+      )
+    }
+    curBalanceSectionZ += balanceExtra
+  }
+  armGroup.push(
+    <AddCounterWeightAreaGLB
+      key={`counterWeightArea`}
+      position={[0, 0, curBalanceSectionZ]}
+      isOnline={isOnline}
+      offlineMaterial={offlineMaterial}
+    />
+  )
+  // 添加小车
+  trolleyGroup.push(
+    <AddTrolleyGLB
+      key={`trolley`}
+      isOnline={isOnline}
+      offlineMaterial={offlineMaterial}
+    />
+  )
+  // 添加小车钢绳
+  let carPositionY = -allGlbSizeObj.trolley.y / 2
+  steelRopeGroup.push(
+    <AddCarSteelRopeGLB
+      key={`carSteelRope`}
+      isOnline={isOnline}
+      offlineMaterial={offlineMaterial}
+    />
+  )
+  trolleyGroup.push(
+    <group
+      ref={steelRopeRef}
+      key={'steelRope-group'}
+      dispose={null}
+      position={[0, carPositionY, 0]}
+    >
+      {steelRopeGroup}
+    </group>
+  )
+  // 添加吊钩
+  carPositionY -= allGlbSizeObj.carSteelRope.y
+  hookGroup.push(
+    <AddHookGLB
+      key={`hook`}
+      isOnline={isOnline}
+      offlineMaterial={offlineMaterial}
+    />
+  )
+  trolleyGroup.push(
+    <group
+      ref={hookRef}
+      key={'hook-group'}
+      dispose={null}
+      position={[0, carPositionY, 0]}
+    >
+      {hookGroup}
+    </group>
+  )
+  // 添加吊物
+  carPositionY -= allGlbSizeObj.hook.y
+  suspendedObjectGroup.push(
+    <AddSuspendedObjectGLB
+      key={`suspendedObject`}
+      isOnline={isOnline}
+      offlineMaterial={offlineMaterial}
+    />
+  )
+  trolleyGroup.push(
+    <group
+      ref={suspendedObjectRef}
+      key={'suspendedObject-group'}
+      dispose={null}
+      position={[0, carPositionY, 0]}
+    >
+      {suspendedObjectGroup}
+    </group>
+  )
+  armGroup.push(
+    <group
+      ref={trolleyRef}
+      key={'trolley-group'}
+      dispose={null}
+    >
+      {trolleyGroup}
+    </group>
+  )
+  turnGroup.push(
+    <group
+      ref={armRef}
+      key={'arm-group'}
+      dispose={null}
+      position={[0, curBodyHeight, 0]}
+    >
+      {armGroup}
+    </group>
+  )
+  craneGroup.push(
+    <Word
+      key={'craneNum'}
+      position={[0, curBodyHeight + allGlbSizeObj.connectingFrame.y + 100, 0]}
+    >{craneNum}</Word>
+  )
+  craneGroup.push(<group ref={turnRef} key={'turn-group'} dispose={null}>{turnGroup}</group>)
+  return craneGroup
+}
+
+export default memo((props: Props) => {
+  const {
+    x,
+    y,
+    craneNum,
+    jibArmLength,
+    craneHeight,
+    balanceArmLength,
+    baseScale,
+    modelScale = 0.038,
+    angle,
+    hookHeight,
+    radius,
+    loadWeight,
+    isOnline,
+    offlineMaterial,
+    animationInterval = 5
+  } = props
+  const curAngleRef = useRef(0);
+  const curTrolleyRef = useRef(0);
+  const curSteelRopeRef = useRef(0);
+
+  const turnRef = useRef<any>(null)
+  const armRef = useRef<any>(null)
+  const turnDeltaRef = useRef<any>({targetAngle: 0, angleDelta: 0})
+  const trolleyRef = useRef<any>(null)
+  const trolleyDeltaRef = useRef<any>({targetTrolley: 0, trolleyDelta: 0, canvasJibArmLength: 0})
+  const steelRopeRef = useRef<any>(null)
+  const steelRopeDeltaRef = useRef<any>({targetSteelRope: 0, steelRopeDelta: 0})
+  const hookRef = useRef<any>(null)
+  const suspendedObjectRef = useRef<any>(null)
+
+  useEffect(() => {
+    if (
+      !armRef.current ||
+      !turnRef.current ||
+      !turnDeltaRef.current ||
+      !trolleyDeltaRef.current ||
+      !steelRopeDeltaRef.current
+    ) return
+    const frame = animationInterval * 60 - 20
+    // 处理角度
+    let targetAngle = -calcRadians(Math.abs(angle % 360))
+    let currentAngle = turnRef.current.rotation.y % (Math.PI * 2)
+    if (Math.abs(currentAngle - targetAngle) > Math.PI) {
+      if (currentAngle < targetAngle) {
+        targetAngle -= Math.PI * 2
+      } else {
+        currentAngle -= Math.PI * 2
+        curAngleRef.current = currentAngle
+      }
+    }
+    const angleDelta = (targetAngle - currentAngle) / frame
+    turnDeltaRef.current = {targetAngle, angleDelta}
+    // 处理小车
+    let newRadius = radius
+    if (radius < 3) {
+      newRadius = 3
+    } else if (radius > jibArmLength) {
+      newRadius = jibArmLength
+    }
+    let targetTrolley = newRadius / modelScale * baseScale
+    const canvasJibArmLength = jibArmLength / modelScale * baseScale - allGlbSizeObj.trolley.z / 2
+    if (targetTrolley > canvasJibArmLength) {
+      targetTrolley = canvasJibArmLength
+    }
+    const trolleyDelta = (-targetTrolley - curTrolleyRef.current) / frame
+    trolleyDeltaRef.current = {targetTrolley, trolleyDelta, canvasJibArmLength}
+    // 处理吊绳
+    let newHookHeight = hookHeight
+    if (hookHeight < 1) {
+      newHookHeight = 1
+    }
+    let targetSteelRope = newHookHeight / modelScale * baseScale
+    const hasSuspendedObject = Boolean(loadWeight)
+    let canvasCraneHeight = armRef.current.position.y - allGlbSizeObj.trolley.y / 2 - allGlbSizeObj.hook.y
+    if (hasSuspendedObject) canvasCraneHeight -= allGlbSizeObj.suspendedObject.y
+    if (targetSteelRope > canvasCraneHeight) {
+      targetSteelRope = canvasCraneHeight
+    }
+    const steelRopeDelta = (targetSteelRope - curSteelRopeRef.current) / frame
+    steelRopeDeltaRef.current = {targetSteelRope, steelRopeDelta}
+  }, [angle, radius, hookHeight, loadWeight, animationInterval]);
+
+  useFrame(({clock}) => {
+    if (
+      !turnRef.current ||
+      !armRef.current ||
+      !trolleyRef.current ||
+      !suspendedObjectRef.current ||
+      !steelRopeRef.current ||
+      !hookRef.current ||
+      !turnDeltaRef.current ||
+      !trolleyDeltaRef.current ||
+      !steelRopeDeltaRef.current
+    ) return
+    // 处理角度
+    const curAngle = curAngleRef.current
+    if (Math.abs(turnDeltaRef.current.targetAngle - curAngle) > 0.01) {
+      const curAngleAddDelta = curAngle + turnDeltaRef.current.angleDelta
+      curAngleRef.current = curAngleAddDelta;
+      turnRef.current.rotation.y = curAngleAddDelta;
+    }
+    // 处理小车
+    const curTrolley = curTrolleyRef.current
+    if (Math.abs(-trolleyDeltaRef.current.targetTrolley - curTrolley) > 0.01 && curTrolley > -trolleyDeltaRef.current.canvasJibArmLength) {
+      const curTrolleyAddDelta = curTrolley + trolleyDeltaRef.current.trolleyDelta
+      curTrolleyRef.current = curTrolleyAddDelta;
+      trolleyRef.current.position.z = curTrolleyAddDelta;
+    }
+    // 处理吊绳
+    const curSteelRope = curSteelRopeRef.current
+    const hasSuspendedObject = Boolean(loadWeight)
+    if (Math.abs(steelRopeDeltaRef.current.targetSteelRope - curSteelRope) > 0.01 && curSteelRope >= 0) {
+      const curSteelRopeAddDelta = curSteelRope + steelRopeDeltaRef.current.steelRopeDelta
+      const steelRopeScale = Math.abs(curSteelRopeAddDelta / allGlbSizeObj.carSteelRope.y)
+      curSteelRopeRef.current = curSteelRopeAddDelta;
+      steelRopeRef.current.scale.y = steelRopeScale;
+      hookRef.current.position.y = -allGlbSizeObj.carSteelRope.y * steelRopeScale
+      suspendedObjectRef.current.position.y = -allGlbSizeObj.carSteelRope.y * steelRopeScale - allGlbSizeObj.hook.y
+    }
+    // 处理吊物
+    if (hasSuspendedObject && armRef.current.position.y + hookRef.current.position.y > allGlbSizeObj.suspendedObject.y) {
+      suspendedObjectRef.current.visible = true
+    } else {
+      suspendedObjectRef.current.visible = false
+    }
+  })
+
+  return (
+    <group position={[x, -50, y]} scale={modelScale} dispose={null}>
+      <AddBaseGLB isOnline={isOnline} offlineMaterial={offlineMaterial}/>
+      <LoadGLB
+        craneHeight={craneHeight}
+        jibArmLength={jibArmLength}
+        balanceArmLength={balanceArmLength}
+        craneNum={craneNum}
+        baseScale={baseScale}
+        modelScale={modelScale}
+        turnRef={turnRef}
+        armRef={armRef}
+        trolleyRef={trolleyRef}
+        steelRopeRef={steelRopeRef}
+        hookRef={hookRef}
+        suspendedObjectRef={suspendedObjectRef}
+        isOnline={isOnline}
+        offlineMaterial={offlineMaterial}
+      />
+    </group>
+  );
+}, (prev, next) => (
+  prev.angle === next.angle &&
+  prev.hookHeight === next.hookHeight &&
+  prev.radius === next.radius &&
+  prev.loadWeight === next.loadWeight &&
+  prev.animationInterval === next.animationInterval
+))
